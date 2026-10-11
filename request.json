@@ -1,5 +1,5 @@
 {
-  "mcp": "security-assessment-mcp",
+  "mcp": "security-assessment-mcp-2",
   "action": "analyze_contract",
   "description": "Analyze Solidity source code for potential security vulnerabilities and return candidate findings.",
   "expectedResponse": "An object with status, filename, source_sha256, summary, and findings. Each finding must contain id, severity, title, file, line, and evidence. Severity is low, medium, high, or critical. Line is a positive integer.",

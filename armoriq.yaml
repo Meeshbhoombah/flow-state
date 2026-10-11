@@ -1,0 +1,23 @@
+version: v1
+identity:
+  api_key: $ARMORIQ_API_KEY
+  user_id: security-service
+  agent_id: security-assessment-bot
+environment: production
+proxy:
+  url: https://proxy.armoriq.ai
+  timeout: 30
+  max_retries: 3
+mcp_servers:
+- id: security-assessment-mcp-2
+  url: https://946a-73-150-135-223.ngrok-free.app/mcp
+  auth:
+    type: none
+  description: Local demo for testing the reponse contract
+policy:
+  allow:
+    - security-assessment-mcp-2.analyze_contract
+  deny: []
+intent:
+  ttl_seconds: 300
+  require_csrg: true
