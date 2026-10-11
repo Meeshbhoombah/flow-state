@@ -1,0 +1,32 @@
+{
+  "name": "flow-state",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Meeshbhoombah/flow-state.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Meeshbhoombah/flow-state/issues"
+  },
+  "homepage": "https://github.com/Meeshbhoombah/flow-state#readme",
+  "dependencies": {
+    "@armoriq/sdk": "^0.6.10",
+    "ajv": "^8.20.0",
+    "openai": "^7.32.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
