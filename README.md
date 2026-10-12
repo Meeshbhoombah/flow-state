@@ -1,21 +1,12 @@
 # Kevlar
 Extends the cryptograpic certainties provided by ArmorIQ
 
-With its hash
-
-A TypeScript application that gates MCP tool responses using ArmorIQ and
-JSON Schema validation, with SHA-256 integrity checks and JSONL audit logs.
-
-`flow-state` demonstrates a security gate around a Solidity-analysis MCP tool.
-It combines ArmorIQ's intent authorization, an exposed local MCP endpoint, and
-a response contract enforced with Ajv. Before execution, the application
-hashes the expected response schema and asks for human approval. It then
-captures an execution plan, obtains a short-lived intent token, invokes the
-authorized tool, validates the returned payload, and records an audit entry.
-The included Solidity analyzer is a deterministic demo heuristic, not a
-complete security scanner.
-
-
+With its `sha256`-based Merkle DAG, ArmorIQ's Intents provide the foothold for
+greater cryptographic certainties, extensible to various sub-systems of an 
+agent. Kevlar checks the JSON structure of a reponse from a call to an MCP 
+server against a pre-defined schema contract that is hashed into the Intent 
+Policy, improving the overall security and auditability of any agent's calls.
+ 
 ## Getting Started
 ### Installation
 #### Pre-Requisites
