@@ -373,7 +373,7 @@ function getResponseSchema(request: ActionRequest): JsonSchema {
   async function executeGatedAction(
     request: ActionRequest,
   ): Promise<unknown> {
-    const schema = getResponseSchema(request);
+    const schema = getResponseSchema(request.mcp, request.action);
 
     assertSupportedSchema(schema);
     ajv.compile(schema as AnySchema);
