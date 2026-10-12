@@ -1,9 +1,13 @@
-
 import { createHash } from "node:crypto";
 import express from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
+import {
+  enforceSignedToolPolicy,
+  TOOL_ACTION,
+  TOOL_ID,
+} from "./tool_policy.js";
 
 const HOST = "127.0.0.1";
 const PORT = 3000;
@@ -21,15 +25,8 @@ function analyzeDemo(filename: string, sourceCode: string) {
   // This is NOT a general-purpose Solidity analyzer.
   const hasExternalCall = sourceCode.includes(".call");
   const resetsBalanceAfterCall =
-  /\.call[\s\S]*?balances\s*\[\s*msg\.sender\s*\]\s*=\s*0\s*;/
-    .test(sourceCode);
-
-  console.log("DETECTOR DEBUG:", {
-    hasExternalCall,
-    resetsBalanceAfterCall,
-    sourceIncludesCall: sourceCode.includes(".call"),
-    sourceIncludesReset: sourceCode.includes("balances[msg.sender] = 0"),
-  });
+    /\.call[\s\S]*?balances\s*\[\s*msg\.sender\s*\]\s*=\s*0\s*;/
+      .test(sourceCode);
 
   const findings = hasExternalCall && resetsBalanceAfterCall
     ? [
@@ -60,22 +57,27 @@ function analyzeDemo(filename: string, sourceCode: string) {
 
 function createSecurityServer() {
   const server = new McpServer({
-    name: "security-assessment-mcp-2",
+    name: TOOL_ID,
     version: "1.0.0",
   });
 
   server.tool(
-    "analyze_contract",
+    TOOL_ACTION,
     "Return a deterministic demo security assessment for Solidity source. " +
-      "This tool is for testing the response contract, not for production audits.",
+      "This tool is for testing signed tool policies and response contracts, " +
+      "not for production audits.",
     {
       filename: z.string().min(1),
       source_code: z.string().min(1),
     },
     async ({ filename, source_code }) => {
-      console.log("analyze_contract handler reached:", {
+      // Fail closed before any analysis or tool side effect.
+      await enforceSignedToolPolicy(TOOL_ID, TOOL_ACTION);
+
+      console.log("Signed tool policy verified:", {
+        toolId: TOOL_ID,
+        action: TOOL_ACTION,
         filename,
-        sourceLength: source_code.length,
       });
 
       const result = analyzeDemo(filename, source_code);
@@ -95,11 +97,10 @@ function createSecurityServer() {
   return server;
 }
 
-app.use("/mcp", express.json(), (req, _res, next) => {
+app.use(ENDPOINT, (req, _res, next) => {
   console.log("Incoming MCP request:", {
     method: req.method,
     contentType: req.headers["content-type"],
-    body: req.body,
   });
   next();
 });
@@ -119,9 +120,9 @@ app.post(ENDPOINT, async (req, res) => {
 
   try {
     await server.connect(transport);
+
     // ArmorIQ adds _iam_context to the top-level request body.
-    // Keep the context available to application logic, but remove
-    // this nonstandard field from the JSON-RPC message passed to MCP.
+    // Remove it from the JSON-RPC message passed to MCP.
     const incoming = req.body as Record<string, unknown>;
     const iamContext = incoming?._iam_context;
 
@@ -129,14 +130,11 @@ app.post(ENDPOINT, async (req, res) => {
     delete jsonRpcBody._iam_context;
 
     console.log("ArmorIQ context present:", iamContext !== undefined);
-    console.log(
-      "JSON-RPC request passed to MCP:",
-      JSON.stringify(jsonRpcBody, null, 2),
-    );
 
     await transport.handleRequest(req, res, jsonRpcBody);
   } catch (error: unknown) {
     console.error("MCP request failed:", error);
+
     if (!res.headersSent) {
       res.status(500).json({
         error: "Internal MCP server error",
@@ -158,8 +156,10 @@ app.delete(ENDPOINT, (_req, res) => {
 });
 
 app.listen(PORT, HOST, () => {
-  console.log(`Security assessment MCP listening on http://${HOST}:${PORT}${ENDPOINT}`);
-  console.log("Tool: analyze_contract");
-  console.log("Mode: deterministic demo; no AI model is called");
+  console.log(
+    `Security assessment MCP listening on http://${HOST}:${PORT}${ENDPOINT}`,
+  );
+  console.log(`Tool: ${TOOL_ID}.${TOOL_ACTION}`);
+  console.log("Mode: signed-policy enforcement enabled");
 });
 
