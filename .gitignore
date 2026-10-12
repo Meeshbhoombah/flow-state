@@ -3,9 +3,13 @@
 
 # Env
 .env
+keys/
 
 # Node
 node_modules/
 
 # Kevlar
+config/signed-policies/
+tool-policy-audit.jsonl
 contract-gate-audit.jsonl
+
