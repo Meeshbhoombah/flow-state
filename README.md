@@ -595,7 +595,7 @@ Verify that the MCP identifier and action match in:
 
 - `armoriq.yaml`
 - The request plan in `request.json`
-- The MCP server registration in `src/mcp-server.ts`
+- The MCP server registration in `mcp/mcp-server.ts`
 - The response schema registry in `src/response_gaurd.ts`
 - The signed-policy configuration
 

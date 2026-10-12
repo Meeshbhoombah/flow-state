@@ -100,7 +100,7 @@ or independent security testing of the tool itself.
 
 #### 3. MCP transport and tool
 
-`src/mcp-server.ts` hosts the MCP server over HTTP. The demo exposes the
+`mcp/mcp-server.ts` hosts the MCP server over HTTP. The demo exposes the
 `analyze_contract` tool through the `/mcp` endpoint.
 
 ```mermaid
@@ -487,7 +487,7 @@ Start the local MCP server before testing the public tunnel. Open a dedicated
 terminal in the project directory:
 
 ```bash
-npx tsx src/mcp-server.ts
+npx tsx mcp/mcp-server.ts
 ```
 
 Keep this process running.
@@ -536,7 +536,7 @@ Open the first terminal:
 
 ```bash
 cd flow-state
-npx tsx src/mcp-server.ts
+npx tsx mcp/mcp-server.ts
 ```
 
 The server must remain running on port `3000`.
@@ -634,7 +634,7 @@ ngrok must be stopped separately.
 **ngrok returns `502 Bad Gateway` or `ERR_NGROK_8012`.**
 
 The tunnel cannot reach the local server. Confirm that `npx tsx
-src/mcp-server.ts` is running and listening on port `3000`.
+mcp/mcp-server.ts` is running and listening on port `3000`.
 
 On macOS or Linux:
 

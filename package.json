@@ -1,13 +1,13 @@
 {
-  "name": "flow-state",
+  "name": "kevlar",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
-    "mcp:dev": "tsx src/mcp-server.ts",
-    "policy": "tsx src/policy_cli.ts",
+    "mcp:dev": "tsx mcp/mcp-server.ts",
+    "policy": "tsx policy-cli/policy_cli.ts",
     "test": "tsx --test src/tool_policy.test.ts"
   },
   "repository": {

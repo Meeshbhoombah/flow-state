@@ -7,7 +7,7 @@ import {
   enforceSignedToolPolicy,
   TOOL_ACTION,
   TOOL_ID,
-} from "./tool_policy.js";
+} from "../src/tool_policy.js";
 
 const HOST = "127.0.0.1";
 const PORT = 3000;
