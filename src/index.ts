@@ -5,8 +5,12 @@ import { createHash } from "node:crypto";
 import { appendFile, readFile } from "node:fs/promises";
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
+import {
+  getResponseSchema,
+  validateToolResponse,
+  type JsonSchema,
+} from "./response-guard.js";
 
-type JsonObject = Record<string, unknown>;
 
 type ActionRequest = {
   mcp: string;
@@ -218,9 +222,9 @@ function getResponseSchema(request: ActionRequest): JsonSchema {
   }
 
   throw new Error(
-      `No predefined response contract for ${request.mcp}.${request.action}`,
-    );
-  }
+    `No predefined response contract for ${request.mcp}.${request.action}`,
+  );
+}
 
 
   /**
