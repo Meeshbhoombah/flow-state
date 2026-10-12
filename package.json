@@ -6,7 +6,9 @@
   "scripts": {
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
-    "mcp:dev": "tsx src/mcp-server.ts"
+    "mcp:dev": "tsx src/mcp-server.ts",
+    "policy": "tsx src/policy-cli.ts",
+    "test": "tsx --test src/tool_policy.test.ts"
   },
   "repository": {
     "type": "git",
