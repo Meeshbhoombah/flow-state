@@ -1,4 +1,4 @@
-
+import Ajv, { type AnySchema } from "ajv";
 import { createHash } from "node:crypto";
 import { appendFile } from "node:fs/promises";
 
@@ -9,33 +9,76 @@ export type JsonSchema = {
 
 type JsonObject = Record<string, unknown>;
 
-const ajv = new Ajv({ allErrors: true, strict: true });
+type AuditContext = {
+  planHash: string;
+  contractHash: string;
+};
 
+type AuditRecord = {
+  timestamp: string;
+  status: "accepted" | "rejected";
+  mcp: string;
+  action: string;
+  planHash: string;
+  contractHash: string;
+  responseHash: string | null;
+  errors?: unknown;
+};
+
+const ajv = new Ajv({
+  allErrors: true,
+  strict: true,
+});
+
+const AUDIT_LOG_PATH = "contract-gate-audit.jsonl";
+
+/**
+ * The response contract for the Solidity security-analysis demo.
+ * Register additional tool contracts in SCHEMA_REGISTRY.
+ */
 const SECURITY_ANALYSIS_SCHEMA: JsonSchema = {
   type: "object",
   properties: {
-    status: { type: "string" },
-    filename: { type: "string", minLength: 1 },
+    status: {
+      type: "string",
+    },
+    filename: {
+      type: "string",
+      minLength: 1,
+    },
     source_sha256: {
       type: "string",
       minLength: 64,
       maxLength: 64,
     },
-    summary: { type: "string" },
+    summary: {
+      type: "string",
+    },
     findings: {
       type: "array",
       items: {
         type: "object",
         properties: {
-          id: { type: "string", minLength: 1 },
+          id: {
+            type: "string",
+          },
           severity: {
             type: "string",
             enum: ["low", "medium", "high", "critical"],
           },
-          title: { type: "string", minLength: 1 },
-          file: { type: "string", minLength: 1 },
-          line: { type: "integer", minimum: 1 },
-          evidence: { type: "string", minLength: 1 },
+          title: {
+            type: "string",
+          },
+          file: {
+            type: "string",
+          },
+          line: {
+            type: "integer",
+            minimum: 1,
+          },
+          evidence: {
+            type: "string",
+          },
         },
         required: [
           "id",
@@ -59,6 +102,10 @@ const SECURITY_ANALYSIS_SCHEMA: JsonSchema = {
   additionalProperties: false,
 };
 
+/**
+ * Every registered tool must have an explicit response contract.
+ * Unknown tools fail closed rather than receiving a permissive schema.
+ */
 const SCHEMA_REGISTRY = new Map<string, JsonSchema>([
   [
     "security-assessment-mcp-2.analyze_contract",
@@ -66,18 +113,14 @@ const SCHEMA_REGISTRY = new Map<string, JsonSchema>([
   ],
 ]);
 
-function sha256(value: string): string {
-  return createHash("sha256").update(value).digest("hex");
-}
-
 function canonicalize(value: unknown): string {
-  function sort(value: unknown): unknown {
-    if (Array.isArray(value)) {
-      return value.map(sort);
+  function sort(input: unknown): unknown {
+    if (Array.isArray(input)) {
+      return input.map(sort);
     }
 
-    if (value !== null && typeof value === "object") {
-      const object = value as Record<string, unknown>;
+    if (input !== null && typeof input === "object") {
+      const object = input as Record<string, unknown>;
 
       return Object.fromEntries(
         Object.keys(object)
@@ -86,18 +129,14 @@ function canonicalize(value: unknown): string {
       );
     }
 
-    return value;
+    return input;
   }
 
   return JSON.stringify(sort(value));
 }
 
-async function writeAudit(record: JsonObject): Promise<void> {
-  await appendFile(
-    "contract-gate-audit.jsonl",
-    `${JSON.stringify(record)}\n`,
-    { mode: 0o600 },
-  );
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 export function getResponseSchema(
@@ -108,65 +147,82 @@ export function getResponseSchema(
   const schema = SCHEMA_REGISTRY.get(key);
 
   if (!schema) {
-    throw new Error(`No response schema registered for ${key}`);
+    throw new Error(
+      `No response contract is registered for ${key}. Action not executed.`,
+    );
   }
 
   return schema;
 }
 
-type AuditContext = {
-  planHash: string;
-  contractHash: string;
-};
+async function writeAudit(record: AuditRecord): Promise<void> {
+  await appendFile(
+    AUDIT_LOG_PATH,
+    `${JSON.stringify(record)}\n`,
+    "utf8",
+  );
+}
 
-type ToolResult = {
-  structuredContent?: unknown;
-  content?: Array<{
-    type?: string;
-    text?: string;
-  }>;
-};
-
-function extractPayload(invocation: unknown): unknown {
+function extractToolPayload(invocation: unknown): unknown {
   if (
     invocation === null ||
     typeof invocation !== "object" ||
     !("result" in invocation)
   ) {
-    throw new Error("Unexpected ArmorIQ invocation result shape.");
+    throw new Error(
+      "Unexpected ArmorIQ invocation result shape.",
+    );
   }
 
-  const toolResult = (invocation as { result: unknown }).result;
+  const invocationResult = (
+    invocation as { result: unknown }
+  ).result;
 
-  if (toolResult === null || typeof toolResult !== "object") {
+  if (
+    invocationResult === null ||
+    typeof invocationResult !== "object"
+  ) {
     throw new Error("ArmorIQ returned an invalid tool result.");
   }
 
-  const result = toolResult as ToolResult;
+  const toolResult = invocationResult as {
+    structuredContent?: unknown;
+    content?: Array<{
+      type?: string;
+      text?: string;
+    }>;
+  };
 
-  if (result.structuredContent !== undefined &&
-      result.structuredContent !== null) {
-    return result.structuredContent;
+  if (toolResult.structuredContent !== undefined &&
+      toolResult.structuredContent !== null) {
+    return toolResult.structuredContent;
   }
 
-  const textContent = result.content?.find(
-    (item) => item.type === "text" && typeof item.text === "string",
+  const textContent = toolResult.content?.find(
+    (item) =>
+      item.type === "text" &&
+      typeof item.text === "string",
   )?.text;
 
   if (typeof textContent !== "string") {
-    throw new Error("Tool returned no structured or text response.");
+    throw new Error(
+      "Tool response contained neither structuredContent nor text content.",
+    );
   }
 
   try {
-    return JSON.parse(textContent);
+    return JSON.parse(textContent) as unknown;
   } catch {
-    throw new Error("Tool returned text that is not valid JSON.");
+    throw new Error(
+      "Tool response text was not valid JSON.",
+    );
   }
 }
 
 /**
- * Extract, validate, and audit one ArmorIQ tool response.
- * Only returns a payload after it passes the registered schema.
+ * Extracts, validates, and audits the tool response.
+ * The caller receives a payload only after schema validation
+ * and successful acceptance auditing.
  */
 export async function validateToolResponse(
   mcp: string,
@@ -174,18 +230,18 @@ export async function validateToolResponse(
   invocation: unknown,
   context: AuditContext,
 ): Promise<unknown> {
-  const key = `${mcp}.${action}`;
   let responseHash: string | null = null;
 
   try {
     const schema = getResponseSchema(mcp, action);
-    const payload = extractPayload(invocation);
+    const payload = extractToolPayload(invocation);
 
     responseHash = sha256(canonicalize(payload));
 
     const validate = ajv.compile(schema as AnySchema);
+    const valid = validate(payload);
 
-    if (!validate(payload)) {
+    if (!valid) {
       const errors = validate.errors ?? [];
 
       await writeAudit({
@@ -193,15 +249,13 @@ export async function validateToolResponse(
         status: "rejected",
         mcp,
         action,
-        schemaKey: key,
         ...context,
         responseHash,
-        reason: "schema_validation_failed",
         errors,
       });
 
       throw new Error(
-        `Response rejected by schema for ${key}: ${JSON.stringify(errors)}`,
+        `Response rejected by schema for ${mcp}.${action}: ${JSON.stringify(errors)}`,
       );
     }
 
@@ -210,33 +264,38 @@ export async function validateToolResponse(
       status: "accepted",
       mcp,
       action,
-      schemaKey: key,
       ...context,
       responseHash,
     });
 
     return payload;
   } catch (error) {
-    // Schema-invalid responses were already audited above.
-    // Avoid writing a duplicate event for that same failure.
-    if (
+    /*
+     * Schema-validation failures have already been audited above.
+     * For extraction, registry, or other failures, record a rejection.
+     */
+    const alreadyAudited =
       error instanceof Error &&
-      error.message.startsWith("Response rejected by schema for ")
-    ) {
-      throw error;
-    }
+      error.message.startsWith(
+        `Response rejected by schema for ${mcp}.${action}:`,
+      );
 
-    await writeAudit({
-      timestamp: new Date().toISOString(),
-      status: "rejected",
-      mcp,
-      action,
-      schemaKey: key,
-      ...context,
-      responseHash,
-      reason: "extraction_or_validation_error",
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
+    if (!alreadyAudited) {
+      await writeAudit({
+        timestamp: new Date().toISOString(),
+        status: "rejected",
+        mcp,
+        action,
+        ...context,
+        responseHash,
+        errors: {
+          message:
+            error instanceof Error
+              ? error.message
+              : String(error),
+        },
+      });
+    }
 
     throw error;
   }

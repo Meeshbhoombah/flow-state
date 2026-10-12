@@ -6,3 +6,6 @@
 
 # Node
 node_modules/
+
+# Kevlar
+contract-gate-audit.jsonl
