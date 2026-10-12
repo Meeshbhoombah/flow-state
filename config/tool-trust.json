@@ -1,0 +1,9 @@
+{
+  "tools": {
+    "security-assessment-mcp-2": {
+      "keyId": "security-assessment-mcp-2-ed25519-v1",
+      "algorithm": "Ed25519",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEApV2CR1g9f+ZSKcW57+W01reMWepYBj+zXL7eld1XmDQ=\n-----END PUBLIC KEY-----\n"
+    }
+  }
+}
