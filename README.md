@@ -1,4 +1,8 @@
 # Kevlar
+Extends the cryptograpic certainties provided by ArmorIQ
+
+With its hash
+
 A TypeScript application that gates MCP tool responses using ArmorIQ and
 JSON Schema validation, with SHA-256 integrity checks and JSONL audit logs.
 
@@ -11,214 +15,10 @@ authorized tool, validates the returned payload, and records an audit entry.
 The included Solidity analyzer is a deterministic demo heuristic, not a
 complete security scanner.
 
-## Architecture
-
-### System overview
-
-The system separates authorization, execution, and response validation.
-This matters because a successful tool invocation does not guarantee that
-its output has the expected structure or is safe to consume.
-
-```mermaid
-flowchart TD
-    U["Developer"] --> CLI["src/index.ts"]
-    CLI --> REQ["request.json"]
-    CLI --> SCHEMA["Response schema registry"]
-    SCHEMA --> HASH["SHA-256 contract hash"]
-    HASH --> APPROVAL["Human approval"]
-    APPROVAL --> PLAN["ArmorIQ plan capture"]
-    PLAN --> TOKEN["Intent token"]
-    TOKEN --> INVOKE["Policy-enforced MCP invocation"]
-    INVOKE --> PROXY["ArmorIQ proxy and IAP"]
-    PROXY --> TUNNEL["ngrok HTTPS tunnel"]
-    TUNNEL --> MCP["Local MCP server"]
-    MCP --> TOOL["analyze_contract"]
-    TOOL --> RESULT["Structured tool response"]
-    RESULT --> VALIDATE["Ajv response validation"]
-    VALIDATE --> AUDIT["JSONL audit log"]
-    VALIDATE --> OUTPUT["Accepted result or rejection"]
-```
-
-### Component responsibilities
-
-#### 1. Request runner
-
-`src/index.ts` is the application's entry point. It loads the request,
-constructs the expected response contract, requests approval, and coordinates
-the ArmorIQ execution flow.
-
-```mermaid
-flowchart TD
-    A["Read request.json"] --> B["Load expected schema"]
-    B --> C["Check supported schema features"]
-    C --> D["Canonicalize and hash schema"]
-    D --> E{"Approved by developer?"}
-    E -- No --> F["Stop before tool execution"]
-    E -- Yes --> G["Capture ArmorIQ plan"]
-    G --> H["Request intent token"]
-    H --> I["Invoke authorized MCP action"]
-    I --> J["Validate and audit response"]
-```
-
-The approval step makes the expected response contract explicit before
-execution. The contract hash can then be associated with the resulting audit
-record, making it easier to identify which contract version governed a run.
-
-#### 2. ArmorIQ authorization
-
-The application uses the ArmorIQ TypeScript SDK to capture a plan, request
-an intent token, and invoke the action through ArmorIQ's policy-enforcement
-path.
-
-```mermaid
-sequenceDiagram
-    participant App as Request runner
-    participant SDK as ArmorIQ SDK
-    participant IAP as ArmorIQ IAP
-    participant Proxy as ArmorIQ proxy
-    participant MCP as MCP server
-
-    App->>SDK: Initialize client
-    App->>SDK: Capture one-step plan
-    SDK->>IAP: Request intent token
-    IAP-->>SDK: Token and step proof
-    App->>SDK: Invoke with policy
-    SDK->>Proxy: Authorized invocation
-    Proxy->>Proxy: Verify plan and policy
-    Proxy->>MCP: Forward authorized tool call
-    MCP-->>Proxy: Tool response
-    Proxy-->>SDK: Invocation result
-    SDK-->>App: Result for validation
-```
-
-The plan identifies the permitted MCP action and its parameters. The
-short-lived token binds the invocation to the captured plan. Policy enforcement
-helps prevent an invocation from silently changing into an unplanned action.
-
-This does not replace input validation, least-privilege policy configuration,
-or independent security testing of the tool itself.
-
-#### 3. MCP transport and tool
-
-`src/mcp-server.ts` hosts the MCP server over HTTP. The demo exposes the
-`analyze_contract` tool through the `/mcp` endpoint.
-
-```mermaid
-flowchart LR
-    SDK["ArmorIQ invocation"] --> HTTPS["ngrok HTTPS endpoint"]
-    HTTPS --> LOCAL["127.0.0.1:3000"]
-    LOCAL --> ROUTE["MCP Streamable HTTP"]
-    ROUTE --> TOOL["analyze_contract"]
-    TOOL --> HASH["Hash source code"]
-    HASH --> HEURISTIC["Run demo heuristic"]
-    HEURISTIC --> JSON["Return structured JSON"]
-```
-
-The tunnel allows ArmorIQ's remote services to reach the local development
-server. The MCP server must be running before the request runner invokes it.
-The public tunnel URL must also match the MCP URL registered with ArmorIQ.
-
-The server strips ArmorIQ's `_iam_context` metadata before passing the request
-to the MCP transport, preventing authorization metadata from being treated
-as an ordinary MCP JSON-RPC parameter.
-
-#### 4. Solidity-analysis heuristic
-
-The current analyzer is deliberately small. It looks for an external `.call`
-and a subsequent assignment that resets `balances[msg.sender]` to zero.
-
-```mermaid
-flowchart TD
-    A["Solidity source"] --> B["Check for external .call"]
-    B --> C["Check for balance reset"]
-    C --> D{"Both patterns detected?"}
-    D -- Yes --> E["Emit DEMO-001 finding"]
-    D -- No --> F["Return without that finding"]
-    E --> G["Add filename and source hash"]
-    F --> G
-    G --> H["Return demo response"]
-```
-
-This is useful for testing the complete execution and validation pipeline.
-It is not a substitute for control-flow analysis, compiler-aware analysis,
-fuzzing, symbolic execution, or a production-grade security scanner.
-The demo may miss vulnerabilities and may produce false positives.
-
-#### 5. Response contract and validation
-
-`src/response_gaurd.ts` contains the response schema registry and validation
-logic. The spelling `gaurd` is intentional here because it matches the
-existing source filename.
-
-The schema requires a response with `status`, `filename`, `source_sha256`,
-`summary`, and `findings`. Each finding must include an identifier, severity,
-title, file, positive line number, and evidence. Unknown properties are
-rejected by the current schema.
-
-```mermaid
-flowchart TD
-    A["MCP invocation result"] --> B["Extract structured payload"]
-    B --> C{"Valid JSON payload?"}
-    C -- No --> REJECT["Reject and audit"]
-    C -- Yes --> D["Validate with Ajv"]
-    D --> E{"Matches response schema?"}
-    E -- No --> REJECT
-    E -- Yes --> F["Calculate response hash"]
-    F --> G["Append accepted audit record"]
-    G --> H["Return payload"]
-```
-
-A successful MCP invocation is not sufficient for acceptance. The payload must
-also satisfy the application's response contract. The application returns the
-payload only after validation and successful audit logging.
-
-#### 6. Audit trail
-
-`contract-gate-audit.jsonl` is an append-only JSON Lines file. Each line is an
-independent JSON object describing an accepted or rejected response.
-
-```mermaid
-flowchart LR
-    VALIDATOR["Response validator"] --> DECISION{"Validation outcome"}
-    DECISION -- Accepted --> A["Accepted audit entry"]
-    DECISION -- Rejected --> R["Rejected audit entry"]
-    A --> LOG["contract-gate-audit.jsonl"]
-    R --> LOG
-```
-
-Records include a timestamp, MCP identifier, action, plan hash, contract hash,
-and response hash. Rejection records may also include validation errors.
-
-These hashes help correlate executions and identify changes. They do not,
-by themselves, provide tamper-proof storage or prove the underlying finding
-is correct. Protect the log and consider signed or remote immutable storage
-for production use.
-
-### Repository layout
-
-```text
-flow-state/
-├── src/
-│   ├── index.ts
-│   ├── mcp-server.ts
-│   └── response_gaurd.ts
-├── armoriq.yaml
-├── request.json
-├── contract-gate-audit.jsonl
-├── package.json
-├── package-lock.json
-└── .env
-```
-
-Some generated files, such as `.env` and the audit log, may be local-only
-and should not be committed if they contain secrets or sensitive data.
 
 ## Getting Started
-
 ### Installation
-
 #### Pre-Requisites
-
 Install the following software before setting up the project.
 
 | Software | Requirement | Purpose |
@@ -236,7 +36,6 @@ The project also needs an ArmorIQ API key, a user identity, an agent identity,
 and an email value as expected by the application's environment configuration.
 
 ##### macOS
-
 On a fresh macOS installation, first install Apple's command-line tools:
 
 ```bash
@@ -248,14 +47,12 @@ Install Homebrew by following its official instructions:
 https://brew.sh/
 
 Then install Git, Node.js, Python, pipx, and ngrok:
-
 ```bash
 brew install git node python pipx
 brew install ngrok/ngrok/ngrok
 ```
 
 Verify the installations:
-
 ```bash
 git --version
 node --version
@@ -269,9 +66,7 @@ If Homebrew or ngrok's installation instructions have changed, follow the
 current official documentation linked below.
 
 ##### Linux
-
 On Ubuntu or Debian, install the basic development tools:
-
 ```bash
 sudo apt update
 sudo apt install -y git curl ca-certificates python3 python3-pip \
@@ -281,7 +76,6 @@ sudo apt install -y git curl ca-certificates python3 python3-pip \
 Install Node.js 18 or newer and npm using a maintained distribution method
 appropriate for your Linux distribution. Verify that the installed versions
 meet the requirements:
-
 ```bash
 git --version
 python3 --version
