@@ -141,92 +141,6 @@ async function generateResponseSchema(
   return schema;
 }
 */
-
-
-const SECURITY_ANALYSIS_SCHEMA: JsonSchema = {
-  type: "object",
-  properties: {
-    status: {
-      type: "string",
-    },
-    filename: {
-      type: "string",
-      minLength: 1,
-    },
-    source_sha256: {
-      type: "string",
-      minLength: 64,
-      maxLength: 64,
-    },
-    summary: {
-      type: "string",
-    },
-    findings: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          id: {
-            type: "string",
-            minLength: 1,
-          },
-          severity: {
-            type: "string",
-            enum: ["low", "medium", "high", "critical"],
-          },
-          title: {
-            type: "string",
-            minLength: 1,
-          },
-          file: {
-            type: "string",
-            minLength: 1,
-          },
-          line: {
-            type: "integer",
-            minimum: 1,
-          },
-          evidence: {
-            type: "string",
-            minLength: 1,
-          },
-        },
-        required: [
-          "id",
-          "severity",
-          "title",
-          "file",
-          "line",
-          "evidence",
-        ],
-        additionalProperties: false,
-      },
-    },
-  },
-  required: [
-    "status",
-    "filename",
-    "source_sha256",
-    "summary",
-    "findings",
-  ],
-  additionalProperties: false,
-};
-
-function getResponseSchema(request: ActionRequest): JsonSchema {
-  if (
-    request.mcp === "security-assessment-mcp-2" &&
-    request.action === "analyze_contract"
-  ) {
-    return SECURITY_ANALYSIS_SCHEMA;
-  }
-
-  throw new Error(
-    `No predefined response contract for ${request.mcp}.${request.action}`,
-  );
-}
-
-
   /**
    * Restrict generated contracts to a small, predictable subset
    * of JSON Schema. This avoids arbitrary schema features and
@@ -350,26 +264,6 @@ function getResponseSchema(request: ActionRequest): JsonSchema {
     }
   }
 
-  function parseResponse(data: unknown): unknown {
-    if (typeof data !== "string") {
-      return data;
-    }
-
-    try {
-      return JSON.parse(data);
-    } catch {
-      throw new Error("Tool returned a string that is not valid JSON.");
-    }
-  }
-
-  async function writeAudit(record: JsonObject): Promise<void> {
-    await appendFile(
-      "contract-gate-audit.jsonl",
-      `${JSON.stringify(record)}\n`,
-      { mode: 0o600 },
-    );
-  }
-
   async function executeGatedAction(
     request: ActionRequest,
   ): Promise<unknown> {
@@ -446,6 +340,7 @@ function getResponseSchema(request: ActionRequest): JsonSchema {
       },
     );
 
+    /*
     console.log("\n--- ArmorIQ invocation result ---");
     console.dir(result, { depth: 4 });
 
@@ -525,6 +420,7 @@ function getResponseSchema(request: ActionRequest): JsonSchema {
     // Don't expose an unvalidated response to the caller.
     throw error;
   }
+  */
 }
 
 async function main(): Promise<void> {
