@@ -7,7 +7,7 @@
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "mcp:dev": "tsx src/mcp-server.ts",
-    "policy": "tsx src/policy-cli.ts",
+    "policy": "tsx src/policy_cli.ts",
     "test": "tsx --test src/tool_policy.test.ts"
   },
   "repository": {
