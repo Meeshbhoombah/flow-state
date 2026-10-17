@@ -238,6 +238,13 @@ async function executeGatedAction(
     validitySeconds: 300,
   });
 
+  if (!token.planId) {
+    throw new Error(
+      "ArmorIQ did not return a plan ID; cannot update plan status",
+    );
+  }
+
+  /*
   const result = await armor.invokeWithPolicy(
     request.mcp,
     request.action,
@@ -247,6 +254,44 @@ async function executeGatedAction(
       userEmail: process.env.USER_EMAIL!,
     },
   );
+  */
+
+  /*
+  let result: unknown;
+
+  try {
+    result = await armor.invokeWithPolicy(
+      request.mcp,
+      request.action,
+      token,
+      request.params,
+      { userEmail: process.env.USER_EMAIL! }
+    );
+
+    console.log("ArmorIQ invocation succeeded");
+    // Keep your existing response-validation logic here.
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error("ArmorIQ invocation failed", {
+        name: error.name,
+        message: error.message,
+        cause: error.cause instanceof Error
+          ? error.cause.message
+          : undefined,
+        stack: error.stack,
+        details: Object.fromEntries(
+          Object.entries(error).filter(
+            ([key]) =>
+              !/token|secret|authorization|api.?key/i.test(key)
+          )
+        ),
+      });
+    } else {
+      console.error("ArmorIQ invocation failed:", String(error));
+    }
+
+    throw error;
+  }
 
   return validateToolResponse(
     request.mcp,
@@ -257,6 +302,57 @@ async function executeGatedAction(
       contractHash,
     },
   );
+  */
+  let result: unknown;
+
+  try {
+    result = await armor.invokeWithPolicy(
+      request.mcp,
+      request.action,
+      token,
+      request.params,
+      { userEmail: process.env.USER_EMAIL! },
+    );
+
+    const validated = validateToolResponse(
+      request.mcp,
+      request.action,
+      result,
+      {
+        planHash,
+        contractHash,
+      },
+    );
+
+    await armor.completePlan(token.planId);
+    return validated;
+  } catch (error: unknown) {
+    await armor.updatePlanStatus(token.planId, "failed");
+
+    if (error instanceof Error) {
+      console.error("ArmorIQ invocation or validation failed", {
+        name: error.name,
+        message: error.message,
+        cause: error.cause instanceof Error
+          ? error.cause.message
+          : undefined,
+        stack: error.stack,
+        details: Object.fromEntries(
+          Object.entries(error).filter(
+            ([key]) =>
+              !/token|secret|authorization|api.?key/i.test(key),
+          ),
+        ),
+      });
+    } else {
+      console.error(
+        "ArmorIQ invocation or validation failed:",
+        String(error),
+      );
+    }
+
+    throw error;
+  }
 }
 
 async function main(): Promise<void> {
