@@ -3,7 +3,10 @@
 
 # Env
 .env
+.env.next
 keys/
+.credentials/
+armoriq.yaml.next
 
 # Node
 node_modules/
@@ -12,4 +15,4 @@ node_modules/
 config/signed-policies/
 tool-policy-audit.jsonl
 contract-gate-audit.jsonl
-
+kevlar-decision-audit.jsonl
