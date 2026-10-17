@@ -1,27 +1,33 @@
 {
   "name": "kevlar",
   "version": "1.0.0",
-  "description": "",
+  "description": "Policy-gated MCP execution with signed tool policies and response contracts",
   "main": "index.js",
   "scripts": {
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "mcp:dev": "tsx mcp/mcp-server.ts",
     "policy": "tsx policy-cli/policy_cli.ts",
-    "test": "tsx --test src/tool_policy.test.ts"
+    "test": "tsx --test src/*.test.ts"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Meeshbhoombah/flow-state.git"
+    "url": "git+https://github.com/Meeshbhoombah/kevlar.git"
   },
-  "keywords": [],
+  "keywords": [
+    "security",
+    "mcp",
+    "armoriq",
+    "policy-enforcement",
+    "response-validation"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/Meeshbhoombah/flow-state/issues"
+    "url": "https://github.com/Meeshbhoombah/kevlar/issues"
   },
-  "homepage": "https://github.com/Meeshbhoombah/flow-state#readme",
+  "homepage": "https://github.com/Meeshbhoombah/kevlar#readme",
   "dependencies": {
     "@armoriq/sdk": "^0.6.10",
     "@modelcontextprotocol/sdk": "^1.32.1",

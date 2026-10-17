@@ -2,8 +2,7 @@
 *.sw*
 
 # Env
-.env
-.env.next
+.env*
 keys/
 .credentials/
 armoriq.yaml.next
